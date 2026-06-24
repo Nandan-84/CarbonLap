@@ -112,7 +112,7 @@ export const OpenF1Engine = {
       };
 
     } catch (error) {
-      console.error('❌ [OpenF1] Telemetry generation failed:', error.message);
+      console.log(`⚠️ [OpenF1] No telemetry data found for Driver #${driverNumber} (using fallback).`);
       return {
         driver: driverNumber,
         totalCarbon: "0.00",
