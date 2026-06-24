@@ -14,6 +14,12 @@ const QUIZ_QUESTIONS = [
   { q: "Will there be a Safety Car in the next 10 laps?", opts: ["YES", "NO"], ans: "NO" },
   { q: "Will the next lap be a personal best?", opts: ["YES", "NO"], ans: "YES" },
   { q: "Will there be a Yellow Flag in Sector 2?", opts: ["YES", "NO"], ans: "NO" },
+  { q: "Will the current race leader maintain P1 for the next 5 laps?", opts: ["YES", "NO"], ans: "YES" },
+  { q: "Which constructor will have the fastest pit stop this race?", opts: ["RED BULL", "MCLAREN", "FERRARI", "OTHER"], ans: "RED BULL" },
+  { q: "Will track temperatures drop by 2°C in the next 15 mins?", opts: ["YES", "NO"], ans: "NO" },
+  { q: "Will the driver in P3 attempt an undercut?", opts: ["YES", "NO"], ans: "YES" },
+  { q: "Who will get the fastest lap of the race?", opts: ["VERSTAPPEN", "NORRIS", "LECLERC", "OTHER"], ans: "NORRIS" },
+  { q: "Will there be a VSC (Virtual Safety Car) soon?", opts: ["YES", "NO"], ans: "NO" },
 ];
 
 type QuizState = 'ASKING' | 'LOCKED' | 'MISSED' | 'RESULT' | 'RACE_CONCLUDED';
@@ -120,7 +126,11 @@ export default function HomeScreen({ navigation, userProfile, authToken, setUser
       
       // Stay on result for 8 seconds, then ask next
       timerId = setTimeout(() => {
-        const nextQ = QUIZ_QUESTIONS[Math.floor(Math.random() * QUIZ_QUESTIONS.length)];
+        let nextQ;
+        do {
+          nextQ = QUIZ_QUESTIONS[Math.floor(Math.random() * QUIZ_QUESTIONS.length)];
+        } while (nextQ.q === currentQuiz?.q);
+
         setCurrentQuiz(nextQ);
         setSelectedOption(null);
         setTimeLeft(30);

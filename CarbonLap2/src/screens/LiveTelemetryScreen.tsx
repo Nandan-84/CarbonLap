@@ -385,7 +385,7 @@ export default function LiveTelemetryScreen({ route, navigation, userProfile, gl
               data={liveLeaderboard}
               renderItem={({ item, index }) => (
                 <View style={[styles.lbRow, item.isMe && styles.lbRowMe]}>
-                  <Text style={[styles.lbPos, item.isMe && styles.textRed]}>P{index + 1}</Text>
+                  <Text style={[styles.lbPos, item.isMe && styles.textRed]}>{isConcluded ? '🏁' : `P${index + 1}`}</Text>
                   <Text style={[styles.lbName, item.isMe && styles.textRed]}>{item.name}</Text>
                   <Text style={[styles.lbTotal, item.isMe && styles.textRed]}>{item.total.toFixed(2)} KG</Text>
                 </View>
