@@ -1,0 +1,89 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id              String   @id @default(uuid())
+  fullName        String
+  age             Int
+  gender          String
+  countryCode     String
+  email           String   @unique
+  passwordHash    String
+
+  // The Onboarding Selections
+  favDriverId     String
+  favTeamId       String
+  fantasyDriverId String
+  fantasyTeamName String?
+
+  // Auth OTP Tokens
+  currentOtp      String?
+  otpExpiry       DateTime?
+
+  // Tracking Fantasy Points
+  totalPoints     Int      @default(0)
+  
+  // Relation to race-by-race point history
+  pointHistory    PointHistory[]
+
+  // Relation to predictions
+  predictions     Prediction[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Prediction {
+  id           String   @id @default(uuid())
+  userId       String
+  questionId   String
+  answer       String
+  timestamp    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // TC_023: Constraint check to prevent duplicate predictions
+  @@unique([userId, questionId])
+}
+
+// This tracks points added after every race
+model PointHistory {
+  id           String   @id @default(uuid())
+  userId       String
+  raceName     String   
+  pointsEarned Int      
+  
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+}
+
+model RaceSession {
+  id              Int      @id @default(autoincrement())
+  session_key     Int      @unique
+  meeting_key     Int
+  country_name    String
+  location        String
+  session_name    String   
+  date_start      String
+  isCompleted     Boolean  @default(false)
+  p1_driver       String?
+  p2_driver       String?
+  p3_driver       String?
+  eco_winner      String?
+}
+
+model DriverStanding {
+  id              Int      @id @default(autoincrement())
+  driver_number   Int      @unique
+  full_name       String
+  team_name       String
+  wdc_points      Float    @default(0)
+  eco_points      Int      @default(0)
+}
