@@ -1,0 +1,13 @@
+
+export const Colors = {
+  OLED_BLACK: '#000000',
+  WHITE: '#FFFFFF',
+  SCUDERIA_RED: '#FF2800',
+  RED_DIM: '#990400',
+  GRAY: '#888888',
+  DARK_GRAY: '#222222',
+  LIGHT_GRAY: '#BBBBBB',
+  GLASS_BORDER: '#333333',
+  CARD_BG: '#0A0A0A',
+  NEON_CYAN: '#00FFFF', 
+};
