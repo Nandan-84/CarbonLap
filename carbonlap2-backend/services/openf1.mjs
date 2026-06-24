@@ -113,7 +113,12 @@ export const OpenF1Engine = {
 
     } catch (error) {
       console.error('❌ [OpenF1] Telemetry generation failed:', error.message);
-      throw error;
+      return {
+        driver: driverNumber,
+        totalCarbon: "0.00",
+        ecoPointsEarned: 0,
+        telemetryTimeline: [] 
+      };
     }
   }
 };
