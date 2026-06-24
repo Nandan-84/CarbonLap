@@ -1,5 +1,5 @@
 // src/screens/LiveTelemetryScreen.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,9 +21,92 @@ const DRIVER_NAMES: any = {
   14: 'FERNANDO ALONSO', 18: 'LANCE STROLL'
 };
 
+const generateRealisticTelemetry = (length: number) => {
+  const data = [];
+  let speed = 0; // starts slow
+  let gear = 1;
+  let rpm = 4000;
+  let throttle = 0;
+  let totalEmission = 0;
+
+  // Track state: 0=straight, 1=braking, 2=corner
+  let state = 0;
+  let stateTimer = 0;
+
+  for (let i = 0; i < length; i++) {
+    stateTimer--;
+    if (stateTimer <= 0) {
+      if (state === 0) { // Straight -> Braking
+        state = 1;
+        stateTimer = Math.floor(Math.random() * 3) + 2; // 2-4 seconds
+      } else if (state === 1) { // Braking -> Corner
+        state = 2;
+        stateTimer = Math.floor(Math.random() * 5) + 3; // 3-7 seconds
+      } else if (state === 2) { // Corner -> Straight
+        state = 0;
+        stateTimer = Math.floor(Math.random() * 15) + 10; // 10-24 seconds
+      }
+    }
+
+    // Apply physics based on state
+    if (state === 0) { // Straight
+      throttle = 100;
+      speed += 10 + Math.random() * 5;
+      if (speed > 330) speed = 330 - Math.random() * 5;
+    } else if (state === 1) { // Braking
+      throttle = 0;
+      speed -= 40 + Math.random() * 10;
+      if (speed < 80) speed = 80 + Math.random() * 10;
+    } else if (state === 2) { // Corner
+      throttle = 40 + Math.random() * 20;
+      speed += (Math.random() * 10 - 5);
+      if (speed < 80) speed = 80;
+      if (speed > 160) speed = 160;
+    }
+
+    // Calculate gear based on speed
+    if (speed < 100) gear = 2;
+    else if (speed < 140) gear = 3;
+    else if (speed < 180) gear = 4;
+    else if (speed < 220) gear = 5;
+    else if (speed < 260) gear = 6;
+    else if (speed < 300) gear = 7;
+    else gear = 8;
+
+    // RPM based on speed within gear band
+    let gearMinSpeed = (gear - 1) * 40 + 20;
+    let gearMaxSpeed = gear * 40 + 20;
+    if (gear === 2) { gearMinSpeed = 60; gearMaxSpeed = 100; }
+    if (gear === 8) { gearMinSpeed = 300; gearMaxSpeed = 350; }
+
+    let speedFraction = (speed - gearMinSpeed) / (gearMaxSpeed - gearMinSpeed);
+    if (speedFraction < 0) speedFraction = 0;
+    if (speedFraction > 1) speedFraction = 1;
+
+    rpm = 8000 + speedFraction * 4000;
+    rpm += Math.random() * 200 - 100; // Small noise
+    if (throttle === 0 && rpm > 10000) rpm -= 1000;
+
+    // Calculate emissions
+    let currentEmission = (throttle / 100) * 1.5 + (rpm / 12000) * 0.5 + Math.random() * 0.2;
+    if (throttle === 0) currentEmission = 0.2;
+    totalEmission += currentEmission;
+
+    data.push({
+      speed: speed,
+      rpm: rpm,
+      gear: gear,
+      throttle: throttle,
+      currentEmission: currentEmission.toFixed(2),
+      totalEmission: totalEmission.toFixed(2)
+    });
+  }
+  return data;
+};
+
 export default function LiveTelemetryScreen({ route, navigation, userProfile, globalLap }: any) {
   const { sessionKey } = route.params || { sessionKey: 9158 };
-  
+
   const driverCode = userProfile?.fantasyDriverId || 'CL';
   const driverNum = DRIVER_MAP[driverCode] || 16;
   const teamName = userProfile?.fantasyTeamName || 'UNNAMED TEAM';
@@ -42,7 +125,84 @@ export default function LiveTelemetryScreen({ route, navigation, userProfile, gl
     return () => clearTimeout(timer);
   }, []);
 
-  const lapCount = globalLap || 14; 
+  const lapCount = globalLap || 14;
+  const isConcluded = lapCount >= 66;
+
+  const [liveDash, setLiveDash] = useState({ speed: 0, gear: 1, rpm: 4000, throttle: 0 });
+
+  const physicsRef = useRef({
+    speed: 80,
+    gear: 2,
+    rpm: 4000,
+    throttle: 0,
+    state: 0, 
+    stateTimer: 0
+  });
+
+  useEffect(() => {
+    if (loading || isConcluded) return;
+
+    const interval = setInterval(() => {
+      let p = physicsRef.current;
+      p.stateTimer--;
+
+      if (p.stateTimer <= 0) {
+        if (p.state === 0) { // straight -> braking
+          p.state = 1; p.stateTimer = Math.floor(Math.random() * 5) + 5; 
+        } else if (p.state === 1) { // braking -> corner
+          p.state = 2; p.stateTimer = Math.floor(Math.random() * 15) + 10; 
+        } else if (p.state === 2) { // corner -> straight
+          p.state = 0; p.stateTimer = Math.floor(Math.random() * 40) + 30; 
+        }
+      }
+
+      if (p.state === 0) { 
+        p.throttle = Math.min(100, p.throttle + 15);
+        p.speed += (p.throttle / 100) * 3 + Math.random() * 0.5;
+        if (p.speed > 335) p.speed = 335 - Math.random() * 2;
+      } else if (p.state === 1) { 
+        p.throttle = Math.max(0, p.throttle - 40);
+        p.speed -= 12 + Math.random() * 4;
+        if (p.speed < 80) p.speed = 80 + Math.random() * 5;
+      } else if (p.state === 2) { 
+        p.throttle = 30 + Math.random() * 30;
+        p.speed += (Math.random() * 3 - 1.5);
+        if (p.speed < 80) p.speed = 80;
+        if (p.speed > 160) p.speed = 160;
+      }
+
+      if (p.speed < 100) p.gear = 2;
+      else if (p.speed < 140) p.gear = 3;
+      else if (p.speed < 180) p.gear = 4;
+      else if (p.speed < 220) p.gear = 5;
+      else if (p.speed < 260) p.gear = 6;
+      else if (p.speed < 300) p.gear = 7;
+      else p.gear = 8;
+
+      let gearMin = (p.gear - 1) * 40 + 20;
+      let gearMax = p.gear * 40 + 20;
+      if (p.gear === 2) { gearMin = 60; gearMax = 100; }
+      if (p.gear === 8) { gearMin = 290; gearMax = 350; }
+      
+      let fraction = (p.speed - gearMin) / (gearMax - gearMin);
+      fraction = Math.max(0, Math.min(1, fraction));
+      
+      let targetRpm = 8000 + fraction * 4000;
+      p.rpm = p.rpm + (targetRpm - p.rpm) * 0.4 + (Math.random() * 200 - 100);
+      
+      if (p.throttle === 0 && p.rpm > 9000) p.rpm -= 600;
+
+      setLiveDash({
+        speed: p.speed,
+        gear: p.gear,
+        rpm: p.rpm,
+        throttle: p.throttle
+      });
+      
+    }, 100); 
+
+    return () => clearInterval(interval);
+  }, [loading, isConcluded]);
 
   const [competitors, setCompetitors] = useState<any[]>([]);
 
@@ -54,8 +214,8 @@ export default function LiveTelemetryScreen({ route, navigation, userProfile, gl
     const generatedCompetitors = others.map(num => ({
       num,
       name: DRIVER_NAMES[num] || `DRIVER #${num}`,
-      baseEmission: 2.0 + Math.random() * 1.5, 
-      rate: 0.012 + Math.random() * 0.015 
+      baseEmission: 2.0 + Math.random() * 1.5,
+      rate: 0.012 + Math.random() * 0.015
     }));
     setCompetitors(generatedCompetitors);
   }, [driverNum]);
@@ -67,33 +227,19 @@ export default function LiveTelemetryScreen({ route, navigation, userProfile, gl
         const res = await fetch(`${API_F1_URL}/replay/${sessionKey}/${driverNum}`);
         if (!res.ok) throw new Error('Failed to fetch telemetry');
         const data = await res.json();
-        
+
         if (isMounted) {
           if (data && data.telemetryTimeline && data.telemetryTimeline.length > 0) {
             setTelemetry(data.telemetryTimeline);
           } else {
-            setTelemetry(Array.from({ length: 1000 }).map((_, i) => ({
-              speed: 150 + Math.random() * 100,
-              rpm: 8000 + Math.random() * 4000,
-              gear: Math.floor(Math.random() * 8) + 1,
-              throttle: Math.random() * 100,
-              currentEmission: (Math.random() * 2).toFixed(2),
-              totalEmission: (i * 0.02).toFixed(2)
-            })));
+            setTelemetry(generateRealisticTelemetry(1000));
           }
           setLoading(false);
         }
       } catch (error: any) {
         console.log("Telemetry fallback activated: OpenF1 API error or invalid session.", error.message);
         if (isMounted) {
-          setTelemetry(Array.from({ length: 1000 }).map((_, i) => ({
-            speed: 200 + Math.random() * 120,
-            rpm: 10000 + Math.random() * 2000,
-            gear: 6,
-            throttle: 80,
-            currentEmission: 1.5,
-            totalEmission: (i * 0.02).toFixed(2)
-          })));
+          setTelemetry(generateRealisticTelemetry(1000));
           setLoading(false);
         }
       }
@@ -109,8 +255,8 @@ export default function LiveTelemetryScreen({ route, navigation, userProfile, gl
     const interval = setInterval(() => {
       setCurrentIndex((prev) => {
         const next = prev + 1;
-        if (next >= telemetry.length) return prev; 
-        
+        if (next >= telemetry.length) return prev;
+
         return next;
       });
 
@@ -126,10 +272,10 @@ export default function LiveTelemetryScreen({ route, navigation, userProfile, gl
 
   const getSortedLeaderboard = () => {
     if (telemetry.length === 0) return [];
-    
+
     const currentData = telemetry[currentIndex] || telemetry[0];
     const myTotal = parseFloat(currentData.totalEmission) || 0;
-    
+
     const lb = competitors.map(comp => {
       const theirTotal = comp.baseEmission + (comp.rate * currentIndex);
       return { isMe: false, name: comp.name, total: theirTotal };
@@ -164,17 +310,17 @@ export default function LiveTelemetryScreen({ route, navigation, userProfile, gl
   }
 
   const rawData = telemetry[currentIndex] || telemetry[0];
-  const isConcluded = lapCount >= 66;
 
-  const currentData = isConcluded 
-    ? { ...rawData, speed: 0, gear: 0, rpm: 0, throttle: 0, currentEmission: 0 }
+  const currentData = isConcluded
+    ? { speed: 0, gear: 0, rpm: 0, throttle: 0, currentEmission: 0, totalEmission: rawData?.totalEmission ?? 0 }
     : {
-        ...rawData,
-        speed: rawData?.speed || (150 + Math.random() * 100),
-        gear: rawData?.gear || (Math.floor(Math.random() * 7) + 2),
-        rpm: rawData?.rpm || (8000 + Math.random() * 4000),
-        throttle: rawData?.throttle || (Math.random() * 100),
-      };
+      speed: liveDash.speed,
+      gear: liveDash.gear,
+      rpm: liveDash.rpm,
+      throttle: liveDash.throttle,
+      currentEmission: rawData?.currentEmission ?? 0,
+      totalEmission: rawData?.totalEmission ?? 0,
+    };
 
   const liveLeaderboard = getSortedLeaderboard();
 
@@ -188,7 +334,7 @@ export default function LiveTelemetryScreen({ route, navigation, userProfile, gl
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        
+
         <View style={styles.teamStrip}>
           <View style={styles.teamHeaderRow}>
             <Text style={styles.teamLabel}>ACTIVE CONSTRUCTOR</Text>
@@ -233,7 +379,7 @@ export default function LiveTelemetryScreen({ route, navigation, userProfile, gl
 
         <View style={styles.leaderboardContainer}>
           <Text style={styles.sectionHeader}>LIVE RACE ECO-LEADERBOARD</Text>
-          
+
           <View style={{ height: 400, width: '100%' }}>
             <FlashList<any>
               data={liveLeaderboard}
@@ -257,14 +403,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.OLED_BLACK },
   loadingContainer: { flex: 1, backgroundColor: Colors.OLED_BLACK, justifyContent: 'center', alignItems: 'center' },
   loadingText: { color: Colors.SCUDERIA_RED, marginTop: 20, fontSize: 12, fontWeight: '900', letterSpacing: 2 },
-  
+
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 60, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: '#222' },
   backBtn: { marginRight: 20 },
   backBtnText: { color: Colors.GRAY, fontSize: 12, fontWeight: '800' },
   headerTitle: { color: Colors.WHITE, fontSize: 20, fontWeight: '900', fontStyle: 'italic', letterSpacing: 1 },
 
   scroll: { padding: 20 },
-  
+
   teamStrip: { backgroundColor: '#1a0505', padding: 15, borderRadius: 10, borderWidth: 1, borderColor: Colors.SCUDERIA_RED, marginBottom: 25 },
   teamHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   lapBadge: { backgroundColor: Colors.SCUDERIA_RED, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
