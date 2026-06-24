@@ -33,6 +33,7 @@ export default function HomeScreen({ navigation, userProfile, authToken, setUser
   // Quiz Engine State
   const [quizState, setQuizState] = useState<QuizState>('ASKING');
   const [currentQuiz, setCurrentQuiz] = useState<any>(QUIZ_QUESTIONS[0]);
+  const askedQuestions = useRef<string[]>([QUIZ_QUESTIONS[0].q]);
   const [timeLeft, setTimeLeft] = useState(30);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [sessionPoints, setSessionPoints] = useState(0);
@@ -126,10 +127,16 @@ export default function HomeScreen({ navigation, userProfile, authToken, setUser
       
       // Stay on result for 8 seconds, then ask next
       timerId = setTimeout(() => {
-        let nextQ;
-        do {
-          nextQ = QUIZ_QUESTIONS[Math.floor(Math.random() * QUIZ_QUESTIONS.length)];
-        } while (nextQ.q === currentQuiz?.q);
+        let available = QUIZ_QUESTIONS.filter(q => !askedQuestions.current.includes(q.q));
+        
+        // Reset pool if all questions have been asked
+        if (available.length === 0) {
+          askedQuestions.current = [];
+          available = QUIZ_QUESTIONS;
+        }
+
+        const nextQ = available[Math.floor(Math.random() * available.length)];
+        askedQuestions.current.push(nextQ.q);
 
         setCurrentQuiz(nextQ);
         setSelectedOption(null);
